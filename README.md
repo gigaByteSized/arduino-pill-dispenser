@@ -1,4 +1,4 @@
-# Arduino IoT: Aeroponics 
+# Arduino IoT: Pill Dispenser 
 
 Pill dispensing system thru IoT using Arduino, DS3231 RTC, and SIM800L.
 
