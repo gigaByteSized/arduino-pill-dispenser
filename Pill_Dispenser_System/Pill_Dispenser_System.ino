@@ -34,10 +34,15 @@ UltraSonicDistanceSensor cupSensor(CUP_TRIG_PIN, CUP_ECHO_PIN);
 #define LED_PIN 7
 #define BUZZER_PIN 8
 
+#define STEPPER1_VDD_PIN 39
+#define STEPPER2_VDD_PIN 41
+#define STEPPER3_VDD_PIN 43
+#define STEPPER4_VDD_PIN 45
+#define STEPPER5_VDD_PIN 47
 
 // GLOBAL VARS
 
-String destNumber = "AT+CMGS=\"+639937251389\""; // CHANGE THE NUMBER in +63XXXXXXXXXX format
+String destNumber = "AT+CMGS=\"+639086472754\""; // CHANGE THE NUMBER in +63XXXXXXXXXX format
 
 const int REVOLUTIONS = 2; // How many revolutions per dispense. For pill-empty-pill, 2 revolutions. For pill-pill, 1 revolution.
 
@@ -225,11 +230,25 @@ void setup() {
   pinMode(WATER_PUMP_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
+
+  pinMode(STEPPER1_VDD_PIN, OUTPUT);
+  pinMode(STEPPER2_VDD_PIN, OUTPUT);
+  pinMode(STEPPER3_VDD_PIN, OUTPUT);
+  pinMode(STEPPER4_VDD_PIN, OUTPUT);
+  pinMode(STEPPER5_VDD_PIN, OUTPUT);
   // SET PINMODES
+
+  digitalWrite(STEPPER1_VDD_PIN, LOW); // turn the sensor OFF
+  digitalWrite(STEPPER2_VDD_PIN, LOW); // turn the sensor OFF
+  digitalWrite(STEPPER3_VDD_PIN, LOW); // turn the sensor OFF
+  digitalWrite(STEPPER4_VDD_PIN, LOW); // turn the sensor OFF
+  digitalWrite(STEPPER5_VDD_PIN, LOW); // turn the sensor OFF
 
   Serial.begin(9600);
   sim800LSerial.begin(9600);
   rtc.begin(); // Initialize the rtc object
+
+
 
   // Set stepper speeds to 10 rpm
   // Sidenote: for some reason, hanggang 10 rpm lang yung steppers na nabili nyo. 
@@ -238,6 +257,14 @@ void setup() {
   dispenser3.setSpeed(10);
   dispenser4.setSpeed(10);
   dispenser5.setSpeed(10);
+
+            Serial.println("turning on stepper");
+      dispenser1.step(stepsPerRevolution * REVOLUTIONS);
+      dispenser2.step(stepsPerRevolution * REVOLUTIONS);
+      // dispenser3.step(stepsPerRevolution * REVOLUTIONS);
+      // dispenser5.step(stepsPerRevolution * REVOLUTIONS);
+      // dispenser4.step(stepsPerRevolution * REVOLUTIONS);
+        Serial.println("end");
 
   // Reset number of pills
   for(int i = 0; i < 5; i++){
@@ -274,14 +301,14 @@ void setup() {
   /////// UNCOMMENT IF GSM MODULE WILL BE USED FOR TESTING AND DEPLOYMENT
 
   tmElements_t s;
-  s.Hour = 18;
-  s.Minute = 40;
+  s.Hour = 4;
+  s.Minute = 58;
   schedules[0][0] = s;
   s.Hour = 19;
-  s.Minute = 00;
+  s.Minute = 2;
   schedules[0][1] = s;
 
-  firstBoot(); // Comment out this line to get rid of boot up message
+  // firstBoot(); // Comment out this line to get rid of boot up message
 
   // Put code here for testing like the ones below for quick functionality tests
 
@@ -300,10 +327,15 @@ void setup() {
   //   }
   // }
 
-  //       Serial.println("turning on stepper");
-  //     dispenser1.step(stepsPerRevolution * REVOLUTIONS);
-  //       Serial.println("end");
 
+
+    // Serial.println("turning on stepper");
+    // digitalWrite(STEPPER1_VDD_PIN, HIGH); //turn the stepper ON
+    // dispenser1.step(stepsPerRevolution * REVOLUTIONS);
+    // digitalWrite(STEPPER1_VDD_PIN, HIGH); //turn the stepper OFF
+    // Serial.println("end");
+    // digitalWrite(WATER_PUMP_PIN, HIGH);
+    // delay(pumpBuffer);//
 }
 
 void loop() { 
@@ -401,7 +433,7 @@ void loop() {
   snooze = 0;
 
   checkForRst:
-  if(snoozeTimer.Min > MAX_SNOOZES){
+  if(snoozeTimer.Minute > MAX_SNOOZES){
     dispensedFlag = 0;
   } 
 
