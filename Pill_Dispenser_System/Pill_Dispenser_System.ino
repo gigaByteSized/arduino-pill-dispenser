@@ -1,4 +1,8 @@
 // #include <DS3231.h>
+#include <AccelStepper.h>
+
+#define HALFSTEP 8
+
 #include <Stepper.h>
 #include <SoftwareSerial.h> 
 #include <HCSR04.h>
@@ -11,16 +15,43 @@ SoftwareSerial sim800LSerial(10,9);  //RX/TX
 DS3232RTC rtc;
 
 // Defines the number of steps per rotation
-const int stepsPerRevolution = 2048;
+// const int stepsPerRevolution = 2048;
+const int endPoint = 4096;
 
 // Initialize steppers
 // Pins entered in sequence IN1-IN3-IN2-IN4 for proper step sequence
-// Stepper dispenser1 = Stepper(stepsPerRevolution, 2, 3, 4, 5);
-Stepper dispenser1 = Stepper(stepsPerRevolution, 22, 24, 26, 28);
-Stepper dispenser2 = Stepper(stepsPerRevolution, 30, 32, 34, 36);
-Stepper dispenser3 = Stepper(stepsPerRevolution, 38, 40, 42, 44);
-Stepper dispenser4 = Stepper(stepsPerRevolution, 23, 25, 27, 29);
-Stepper dispenser5 = Stepper(stepsPerRevolution, 31, 33, 35, 37);
+
+#define d1_1  22     // IN1 on ULN2003 ==> Blue   on 28BYJ-48
+#define d1_2  24     // IN2 on ULN2004 ==> Pink   on 28BYJ-48
+#define d1_3  26    // IN3 on ULN2003 ==> Yellow on 28BYJ-48
+#define d1_4  28    // IN4 on ULN2003 ==> Orange on 28BYJ-48
+
+#define d2_1  30     // IN1 on ULN2003 ==> Blue   on 28BYJ-48
+#define d2_2  32     // IN2 on ULN2004 ==> Pink   on 28BYJ-48
+#define d2_3  34    // IN3 on ULN2003 ==> Yellow on 28BYJ-48
+#define d2_4  36    // IN4 on ULN2003 ==> Orange on 28BYJ-48
+
+#define d3_1  38     // IN1 on ULN2003 ==> Blue   on 28BYJ-48
+#define d3_2  40     // IN2 on ULN2004 ==> Pink   on 28BYJ-48
+#define d3_3  42    // IN3 on ULN2003 ==> Yellow on 28BYJ-48
+#define d3_4  44    // IN4 on ULN2003 ==> Orange on 28BYJ-48
+
+#define d4_1  23     // IN1 on ULN2003 ==> Blue   on 28BYJ-48
+#define d4_2  25     // IN2 on ULN2004 ==> Pink   on 28BYJ-48
+#define d4_3  27    // IN3 on ULN2003 ==> Yellow on 28BYJ-48
+#define d4_4  29    // IN4 on ULN2003 ==> Orange on 28BYJ-48
+
+#define d5_1  31     // IN1 on ULN2003 ==> Blue   on 28BYJ-48
+#define d5_2  33     // IN2 on ULN2004 ==> Pink   on 28BYJ-48
+#define d5_3  35    // IN3 on ULN2003 ==> Yellow on 28BYJ-48
+#define d5_4  37    // IN4 on ULN2003 ==> Orange on 28BYJ-48
+
+AccelStepper dispenser1(HALFSTEP, d1_1, d1_3, d1_2, d1_4);
+AccelStepper dispenser2(HALFSTEP, d2_1, d2_3, d2_2, d2_4);
+AccelStepper dispenser3(HALFSTEP, d3_1, d3_3, d3_2, d3_4);
+AccelStepper dispenser4(HALFSTEP, d4_1, d4_3, d4_2, d4_4);
+AccelStepper dispenser5(HALFSTEP, d5_1, d5_3, d5_2, d5_4);
+
 
 // Initialize ultrasonic sensors
 #define TANK_TRIG_PIN 2
@@ -34,17 +65,12 @@ UltraSonicDistanceSensor cupSensor(CUP_TRIG_PIN, CUP_ECHO_PIN);
 #define LED_PIN 7
 #define BUZZER_PIN 8
 
-#define STEPPER1_VDD_PIN 39
-#define STEPPER2_VDD_PIN 41
-#define STEPPER3_VDD_PIN 43
-#define STEPPER4_VDD_PIN 45
-#define STEPPER5_VDD_PIN 47
-
 // GLOBAL VARS
 
-String destNumber = "AT+CMGS=\"+639086472754\""; // CHANGE THE NUMBER in +63XXXXXXXXXX format
+String destNumber = "AT+CMGS=\"+639817526118\""; // CHANGE THE NUMBER in +63XXXXXXXXXX format
+// String destNumber = "AT+CMGS=\"+639086472754\""; // CHANGE THE NUMBER in +63XXXXXXXXXX format
 
-const int REVOLUTIONS = 2; // How many revolutions per dispense. For pill-empty-pill, 2 revolutions. For pill-pill, 1 revolution.
+// const int REVOLUTIONS = 2; // How many revolutions per dispense. For pill-empty-pill, 2 revolutions. For pill-pill, 1 revolution.
 
 const int MAX_NUM_PILLS = 10;
 const int MAX_NUM_SCHEDULES = 3;
@@ -189,15 +215,15 @@ void storageTelemetry(){
 
 float tankLevelTelemetry(){
   float distance = tankSensor.measureDistanceCm();
-  // Serial.print(F("Tank Level: "));
-  // Serial.println(distance);
+  Serial.print(F("Tank Level: "));
+  Serial.println(distance);
   return distance;
 }
 
 float cupTelemetry(){
   float distance = cupSensor.measureDistanceCm();
-  // Serial.print(F("Cup distance: "));
-  // Serial.println(distance);
+  Serial.print(F("Cup distance: "));
+  Serial.println(distance);
   return distance;
 }
 
@@ -230,41 +256,33 @@ void setup() {
   pinMode(WATER_PUMP_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
-
-  pinMode(STEPPER1_VDD_PIN, OUTPUT);
-  pinMode(STEPPER2_VDD_PIN, OUTPUT);
-  pinMode(STEPPER3_VDD_PIN, OUTPUT);
-  pinMode(STEPPER4_VDD_PIN, OUTPUT);
-  pinMode(STEPPER5_VDD_PIN, OUTPUT);
   // SET PINMODES
 
-  digitalWrite(STEPPER1_VDD_PIN, LOW); // turn the sensor OFF
-  digitalWrite(STEPPER2_VDD_PIN, LOW); // turn the sensor OFF
-  digitalWrite(STEPPER3_VDD_PIN, LOW); // turn the sensor OFF
-  digitalWrite(STEPPER4_VDD_PIN, LOW); // turn the sensor OFF
-  digitalWrite(STEPPER5_VDD_PIN, LOW); // turn the sensor OFF
 
   Serial.begin(9600);
   sim800LSerial.begin(9600);
   rtc.begin(); // Initialize the rtc object
 
+  dispenser1.setMaxSpeed(1000.0);
+  dispenser1.setAcceleration(100.0);
+  dispenser1.setSpeed(200);
+  
+  dispenser2.setMaxSpeed(1000.0);
+  dispenser2.setAcceleration(100.0);
+  dispenser2.setSpeed(200);
 
+  dispenser3.setMaxSpeed(1000.0);
+  dispenser3.setAcceleration(100.0);
+  dispenser3.setSpeed(200);
 
-  // Set stepper speeds to 10 rpm
-  // Sidenote: for some reason, hanggang 10 rpm lang yung steppers na nabili nyo. 
-  dispenser1.setSpeed(10);
-  dispenser2.setSpeed(10);
-  dispenser3.setSpeed(10);
-  dispenser4.setSpeed(10);
-  dispenser5.setSpeed(10);
+  dispenser4.setMaxSpeed(1000.0);
+  dispenser4.setAcceleration(100.0);
+  dispenser4.setSpeed(200);
 
-            Serial.println("turning on stepper");
-      dispenser1.step(stepsPerRevolution * REVOLUTIONS);
-      dispenser2.step(stepsPerRevolution * REVOLUTIONS);
-      // dispenser3.step(stepsPerRevolution * REVOLUTIONS);
-      // dispenser5.step(stepsPerRevolution * REVOLUTIONS);
-      // dispenser4.step(stepsPerRevolution * REVOLUTIONS);
-        Serial.println("end");
+  dispenser5.setMaxSpeed(1000.0);
+  dispenser5.setAcceleration(100.0);
+  dispenser5.setSpeed(200);
+
 
   // Reset number of pills
   for(int i = 0; i < 5; i++){
@@ -285,21 +303,23 @@ void setup() {
 
   /////// UNCOMMENT IF GSM MODULE WILL BE USED FOR TESTING AND DEPLOYMENT
 
-  // while(!sim800LSerial.available()){
-  //   sim800LSerial.println("AT");
-  //   delay(1000); 
-  //   Serial.println("Connecting...");
-  // } Serial.println("Connected!");  
-  // sim800LSerial.println("AT+CSQ");
-  // sim800LSerial.println("AT+CNMI?");
-  // sim800LSerial.println("AT+CMGF=1");  //Set SMS to Text Mode 
-  // delay(1000);  
-  // sim800LSerial.println("AT+CNMI=1,2,0,0,0");  // Handle newly arrived messages(command name in text: new message indications to TE) 
-  // delay(1000);
-  // sim800LSerial.println("AT+CMGL=\"REC UNREAD\""); // Read Unread Messages
+  while(!sim800LSerial.available()){
+    sim800LSerial.println("AT");
+    delay(1000); 
+    Serial.println("Connecting...");
+  } Serial.println("Connected!");  
+  sim800LSerial.println("AT+CSQ");
+  sim800LSerial.println("AT+CNMI?");
+  sim800LSerial.println("AT+CMGF=1");  //Set SMS to Text Mode 
+  delay(1000);  
+  sim800LSerial.println("AT+CNMI=1,2,0,0,0");  // Handle newly arrived messages(command name in text: new message indications to TE) 
+  delay(1000);
+  sim800LSerial.println("AT+CMGL=\"REC UNREAD\""); // Read Unread Messages
 
   /////// UNCOMMENT IF GSM MODULE WILL BE USED FOR TESTING AND DEPLOYMENT
 
+
+  // HARDCODED SCHEDULES
   tmElements_t s;
   s.Hour = 4;
   s.Minute = 58;
@@ -307,8 +327,17 @@ void setup() {
   s.Hour = 19;
   s.Minute = 2;
   schedules[0][1] = s;
+  // HARDCODED SCHEDULES
 
-  // firstBoot(); // Comment out this line to get rid of boot up message
+  // // HARDCODED PILL COUNTS
+  // pillCount[0] = 5;
+  // pillCount[2] = 5;
+  // pillCount[3] = 5;
+  // pillCount[4] = 5;
+  // // HARDCODED PILL COUNTS
+
+
+  firstBoot(); // Comment out this line to get rid of boot up message
 
   // Put code here for testing like the ones below for quick functionality tests
 
@@ -327,15 +356,9 @@ void setup() {
   //   }
   // }
 
-
-
-    // Serial.println("turning on stepper");
-    // digitalWrite(STEPPER1_VDD_PIN, HIGH); //turn the stepper ON
-    // dispenser1.step(stepsPerRevolution * REVOLUTIONS);
-    // digitalWrite(STEPPER1_VDD_PIN, HIGH); //turn the stepper OFF
-    // Serial.println("end");
     // digitalWrite(WATER_PUMP_PIN, HIGH);
     // delay(pumpBuffer);//
+    // digitalWrite(WATER_PUMP_PIN, LOW);
 }
 
 void loop() { 
@@ -346,6 +369,7 @@ void loop() {
 
   // Check dispensers
   for(int i = 0; i < 5; i++){
+    delay(3000);
     if(pillCount[i] == 0){
       String msg = String("Pill dispenser ") + String(i+1) + String(" is empty!");
       pillCount[i] = -1;
@@ -353,7 +377,6 @@ void loop() {
       skipFlag = 1;
       blinkAndBuzz();
     }
-    delay(3000);
   } if(skipFlag == 1) goto recv;
 
   // Check water tank
@@ -397,15 +420,20 @@ void loop() {
     toggleRelay(WATER_PUMP_PIN);
 
     if(toDispense[0] == 1) {
-      dispenser1.step(stepsPerRevolution * REVOLUTIONS);
+      dispenser1.moveTo(endPoint);
+      // dispenser1.step(stepsPerRevolution * REVOLUTIONS);
     } if(toDispense[1] == 1) {
-      dispenser2.step(stepsPerRevolution * REVOLUTIONS);
+      dispenser2.moveTo(endPoint);
+      // dispenser2.step(stepsPerRevolution * REVOLUTIONS);
     } if(toDispense[2] == 1) {
-      dispenser3.step(stepsPerRevolution * REVOLUTIONS);
+      dispenser3.moveTo(endPoint);
+      // dispenser3.step(stepsPerRevolution * REVOLUTIONS);
     } if(toDispense[3] == 1) {
-      dispenser4.step(stepsPerRevolution * REVOLUTIONS);
+      dispenser4.moveTo(endPoint);
+      // dispenser4.step(stepsPerRevolution * REVOLUTIONS);
     }  if(toDispense[4] == 1) {
-      dispenser5.step(stepsPerRevolution * REVOLUTIONS);
+      dispenser5.moveTo(endPoint);
+      // dispenser5.step(stepsPerRevolution * REVOLUTIONS);
     } 
     
     goto resetSnooze;
@@ -414,9 +442,7 @@ void loop() {
       lastSnooze.Hour = hour();
       lastSnooze.Minute = minute();
       snooze = 1;
-    }
-
-    sendMessage("No cup detected! Please place cup below the water dispenser to dispense your pill/s");
+    } sendMessage("No cup detected! Please place cup below the water dispenser to dispense your pill/s");
   }
 
 
@@ -433,7 +459,7 @@ void loop() {
   snooze = 0;
 
   checkForRst:
-  if(snoozeTimer.Minute > MAX_SNOOZES){
+  if(snoozeTimer.Minute - minute() > MAX_SNOOZES){
     dispensedFlag = 0;
   } 
 
@@ -669,6 +695,32 @@ void loop() {
       //   Serial.print(": ");
       //   Serial.println(pillCount[i]);
       // } 
+  }
+  
+  while (dispenser1.distanceToGo() != 0){
+    dispenser1.run();
+  }if(dispenser1.distanceToGo() == 0){
+    dispenser1.setCurrentPosition(0);
+  }
+  while (dispenser2.distanceToGo() != 0){
+    dispenser2.run();
+  }if(dispenser1.distanceToGo() == 0){
+    dispenser2.setCurrentPosition(0);
+  }
+  while (dispenser3.distanceToGo() != 0){
+    dispenser3.run();
+  }if(dispenser1.distanceToGo() == 0){
+    dispenser3.setCurrentPosition(0);
+  }
+  while (dispenser4.distanceToGo() != 0){
+    dispenser4.run();
+  }if(dispenser1.distanceToGo() == 0){
+    dispenser4.setCurrentPosition(0);
+  }
+  while (dispenser5.distanceToGo() != 0){
+    dispenser5.run();
+  }if(dispenser1.distanceToGo() == 0){
+    dispenser5.setCurrentPosition(0);
   }
 //  delay(1000); 
 }
