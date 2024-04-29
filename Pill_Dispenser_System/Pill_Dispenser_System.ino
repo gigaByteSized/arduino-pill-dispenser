@@ -88,6 +88,7 @@ char incomingByte;
 String inputString;
 
 int skipFlag;
+int tankSkipFlag;
 int dispensedFlag;
 
 int pillCount[5];
@@ -96,23 +97,25 @@ int numSchedules[5];
 
 
 // Change this
-int pillNames[] = {"1", "2", "3", "4", "5"};
+String pillNames[] = {"1", "2", "3", "4", "5"};
 
 tmElements_t snoozeTimer;
 tmElements_t lastSnooze;
 
 // Tank level, in cm
 float tank_level = 0;
+float tank_level_previous = 0;
 float tankLevelHigh = 3.0; // 3cm gap between sensor and top of water
-float tankLevelLow = 10.0; // 10cm gap, calibrate depending on tank height, CHANGE THIS
+float tankLevelLow = 15.0; // 10cm gap, calibrate depending on tank height, CHANGE THIS
 
 // Cup distance, in cm
 float cup_distance = 0;
 float cupThreshold = 3.0; // 3cm gap between sensor and cup, CHANGE THIS
 
-int pumpBuffer = 2000; // pump for 2 seconds, CHANGE THIS
+int pumpBuffer = 40000; // pump for 40 seconds, CHANGE THIS
 
 void firstBoot(){
+  Serial.println("Sending first boot message to registered number.");
   sim800LSerial.println("AT+CMGF=1");
   updateSerial();
   sim800LSerial.println(destNumber);
@@ -136,9 +139,11 @@ void firstBoot(){
 
   updateSerial();
   sim800LSerial.write(26);
+  delay(5000);
 }
 
 void help(){
+  Serial.println("Sending help message to registered number.");
   sim800LSerial.println("AT+CMGF=1");
   updateSerial();
   sim800LSerial.println(destNumber);
@@ -150,7 +155,7 @@ void help(){
   sim800LSerial.println("Since I have five dispensers, you can only choose P1-P5.");
   sim800LSerial.println("Similarly, I can only hold 10 pills at a time you can add up to 10 pills at a time.");
   sim800LSerial.println(" ");
-  sim800LSerial.print("To bring up this help menu again, just send \"?\".");
+  sim800LSerial.print("To bring up this help menu again, just send \"SHOW HELP\".");
 
   updateSerial();
   sim800LSerial.write(26);
@@ -161,6 +166,7 @@ void handleError(){
 }
 
 void sendMessage(String message){
+  Serial.println("Sending message to registered number.");
   sim800LSerial.println("AT+CMGF=1");
   updateSerial();
   sim800LSerial.println(destNumber);
@@ -168,9 +174,11 @@ void sendMessage(String message){
   sim800LSerial.print(message); //Your message
   updateSerial();
   sim800LSerial.write(26);
+  delay(2000);
 }
 
 void scheduleTelemetry(){
+  Serial.println("Sending schedule to registered number.");
   sim800LSerial.println("AT+CMGF=1");
   updateSerial();
   sim800LSerial.println(destNumber);
@@ -186,16 +194,19 @@ void scheduleTelemetry(){
       if(schedules[i][j].Hour == 25) {
         sim800LSerial.println("Schedule not set");
       } else {
-        String str2 = String(schedules[i][j].Hour) + String(":") + String(schedules[i][j].Minute);
+        String hour = (schedules[i][j].Hour < 10) ? String("0") + String(schedules[i][j].Hour) : String(schedules[i][j].Hour);
+        String minute = (schedules[i][j].Minute < 10) ? String("0") + String(schedules[i][j].Minute) : String(schedules[i][j].Minute);
+        String str2 = hour + String(":") + minute;
         sim800LSerial.println(str2);
       }
-    }
+    } if(i < 4) sim800LSerial.println(" ");
   }
   updateSerial();
   sim800LSerial.write(26);
 }
 
 void storageTelemetry(){
+  Serial.println("Sending storage information to registered number.");
   sim800LSerial.println("AT+CMGF=1");
   updateSerial();
   sim800LSerial.println(destNumber);
@@ -262,6 +273,20 @@ void setup() {
   Serial.begin(9600);
   sim800LSerial.begin(9600);
   rtc.begin(); // Initialize the rtc object
+  tmElements_t rtcTime;
+  String compileDate = __DATE__;
+  String compileTime = __TIME__;
+  rtcTime.Month = (uint8_t) monthToInt(compileDate.substring(0,3));
+  rtcTime.Day = (uint8_t) compileDate.substring(4,6).toInt();
+  rtcTime.Year = (uint8_t) compileDate.substring(7).toFloat() - 1970;
+  rtcTime.Hour = (uint8_t) compileTime.substring(0,2).toInt();
+  rtcTime.Minute = (uint8_t) compileTime.substring(3,6).toInt();
+  rtcTime.Second = (uint8_t) compileTime.substring(6).toInt();
+
+
+  time_t  tt = makeTime(rtcTime);
+  rtc.set(tt);   // use the time_t value to ensure correct weekday is set
+  setTime(tt);
 
   dispenser1.setMaxSpeed(1000.0);
   dispenser1.setAcceleration(100.0);
@@ -309,36 +334,49 @@ void setup() {
     Serial.println("Connecting...");
   } Serial.println("Connected!");  
   sim800LSerial.println("AT+CSQ");
+  updateSerial();
+  sim800LSerial.println("AT+CCID");
+  updateSerial();
+  sim800LSerial.println("AT+CREG?");
+  updateSerial();
   sim800LSerial.println("AT+CNMI?");
+  updateSerial();
+  sim800LSerial.println("AT+CSCS=\"GSM\"");
+  updateSerial();
   sim800LSerial.println("AT+CMGF=1");  //Set SMS to Text Mode 
+  updateSerial();
   delay(1000);  
   sim800LSerial.println("AT+CNMI=1,2,0,0,0");  // Handle newly arrived messages(command name in text: new message indications to TE) 
+  updateSerial();
   delay(1000);
   sim800LSerial.println("AT+CMGL=\"REC UNREAD\""); // Read Unread Messages
+  updateSerial();
 
   /////// UNCOMMENT IF GSM MODULE WILL BE USED FOR TESTING AND DEPLOYMENT
 
 
   // HARDCODED SCHEDULES
   tmElements_t s;
-  s.Hour = 4;
+  s.Hour = 16;
   s.Minute = 58;
   schedules[0][0] = s;
-  s.Hour = 19;
-  s.Minute = 2;
+  s.Hour = 13;
+  s.Minute = 24;
   schedules[0][1] = s;
   // HARDCODED SCHEDULES
 
   // // HARDCODED PILL COUNTS
-  // pillCount[0] = 5;
-  // pillCount[2] = 5;
-  // pillCount[3] = 5;
-  // pillCount[4] = 5;
+  pillCount[0] = 5;
+  pillCount[1] = 5;
+  pillCount[2] = 5;
+  pillCount[3] = 5;
+  pillCount[4] = 5;
   // // HARDCODED PILL COUNTS
 
 
   firstBoot(); // Comment out this line to get rid of boot up message
-
+  delay(10000);
+  // blinkAndBuzz();
   // Put code here for testing like the ones below for quick functionality tests
 
   // for(int i=0; i < 5; i++){
@@ -359,32 +397,85 @@ void setup() {
     // digitalWrite(WATER_PUMP_PIN, HIGH);
     // delay(pumpBuffer);//
     // digitalWrite(WATER_PUMP_PIN, LOW);
+      // dispenser1.moveTo(endPoint);
+      // dispenser2.moveTo(endPoint);
+      // dispenser3.moveTo(endPoint);
+      // dispenser4.moveTo(endPoint);
+      // dispenser5.moveTo(endPoint);
+
 }
 
 void loop() { 
+  // goto recv;
   // CHECK LOOP
   skipFlag = 0; // always reset skip flag
-  
+  // tankSkipFlag = 0;
+
+  // Serial.println("Time:");
+  // Serial.println(String(hour() + ":" + minute()));
+
   if(snooze == 1) goto dispense;
 
   // Check dispensers
+  int empty[] = {0,0,0,0,0};
   for(int i = 0; i < 5; i++){
-    delay(3000);
+    // delay(3000);
     if(pillCount[i] == 0){
-      String msg = String("Pill dispenser ") + String(i+1) + String(" is empty!");
+      empty[i] = 1;
+      // String msg = String("Pill dispenser ") + String(i+1) + String(" is empty!");
       pillCount[i] = -1;
+      // sendMessage(msg);
+      // skipFlag = 1;
+      blinkAndBuzz();
+    } else if(pillCount[i] == -1){
+      skipFlag = 1;
+    }
+  }
+
+  if(skipFlag == 0){
+    bool hasEmpty = false;
+    String emptyDispensers;
+    emptyDispensers.reserve(15);
+    emptyDispensers = "";
+    for(int i = 0; i < 5; i++){
+      if(empty[i] == 1){
+        hasEmpty = true;
+        emptyDispensers.concat((emptyDispensers == "") ? String(i+1) : String(", ") + String(i+1));
+        // emptyDispensers = emptyDispensers + String(i+1) + String(", ");
+        Serial.println(emptyDispensers);
+      } 
+    }
+    if(hasEmpty){
+      if(emptyDispensers.length() > 1){
+        String temp = emptyDispensers.substring(emptyDispensers.length() - 1);
+        emptyDispensers = emptyDispensers.substring(0, emptyDispensers.length() - 1) + String("and ") + temp;
+      }
+      delay(3000);
+      String msg = (emptyDispensers.length() == 1) ? String("Pill dispenser ") + emptyDispensers + String(" is empty!") : String("Pill dispensers ") + emptyDispensers + String(" are empty!");
       sendMessage(msg);
       skipFlag = 1;
-      blinkAndBuzz();
     }
-  } if(skipFlag == 1) goto recv;
+  }
+  
+  if(skipFlag == 1) goto recv;
 
   // Check water tank
   tank_level = tankLevelTelemetry();
+  delay(1000);
+
+  if(tank_level_previous != 0 && (int) tank_level >= (int) tank_level_previous){
+    tank_level_previous = tank_level;
+    goto recv;
+  }
   if(tank_level >= tankLevelLow){
+    tank_level_previous = tank_level;
+    String msg = String("Tank level low. Please refill with clean water!");
+    sendMessage(msg);
     blinkAndBuzz();
     goto recv;
   }
+
+  if(dispensedFlag == 1) goto checkForRst;
 
   // CHECK SCHEDULES
   int toDispense[] = {0,0,0,0,0};
@@ -397,11 +488,10 @@ void loop() {
         snoozeTimer.Minute = minute();
         String msg = String("Hello! Its now time to take ") + pillNames[i];
         sendMessage(msg);
+        delay(5000);
       }
     }
   }
-
-  if(dispensedFlag == 1) goto checkForRst;
 
   for(int i=0; i < 5; i++){
     if (toDispense[i] == 1) goto dispense;
@@ -415,9 +505,9 @@ void loop() {
     // WAIT FOR 1s first before dispensing
 
     // DISPENSE WATER
-    toggleRelay(WATER_PUMP_PIN);
+    digitalWrite(WATER_PUMP_PIN, HIGH);
     delay(pumpBuffer);
-    toggleRelay(WATER_PUMP_PIN);
+    digitalWrite(WATER_PUMP_PIN, LOW);
 
     if(toDispense[0] == 1) {
       dispenser1.moveTo(endPoint);
@@ -436,6 +526,7 @@ void loop() {
       // dispenser5.step(stepsPerRevolution * REVOLUTIONS);
     } 
     
+    dispensedFlag = 1;
     goto resetSnooze;
   } else{
     if(snooze == 0){
@@ -506,11 +597,6 @@ void loop() {
 
       inputString = inputString.substring(inputString.lastIndexOf('"') + 1);
       inputString.trim();
-
-      if(inputString[0] == '?'){
-        help();
-        goto skip;
-      }
 
       if(inputString.indexOf("SHOW SCHEDULES") > -1){
         scheduleTelemetry();
@@ -736,4 +822,44 @@ void updateSerial()
   {
     Serial.write(sim800LSerial.read());
   }
+}
+
+void digitalClockDisplay()
+{
+    // digital clock display of the time
+    Serial.print(hour());
+    printDigits(minute());
+    printDigits(second());
+    Serial.print(' ');
+    Serial.print(day());
+    Serial.print(' ');
+    Serial.print(month());
+    Serial.print(' ');
+    Serial.print(year());
+    Serial.println();
+}
+
+void printDigits(int digits)
+{
+    // utility function for digital clock display: prints preceding colon and leading 0
+    Serial.print(':');
+    if(digits < 10)
+        Serial.print('0');
+    Serial.print(digits);
+}
+
+int monthToInt(String month){
+  // Serial.println(month);
+  if(month == "Jan") return 1;
+  if(month == "Feb") return 2;
+  if(month == "Mar") return 3;
+  if(month == "Apr") return 4;
+  if(month == "May") return 5;
+  if(month == "Jun") return 6;
+  if(month == "Jul") return 7;
+  if(month == "Aug") return 8;
+  if(month == "Sep") return 9;
+  if(month == "Oct") return 10;
+  if(month == "Nov") return 11;
+  if(month == "Dec") return 12;
 }
